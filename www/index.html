@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Netcalc</title>
+    </head>
+    <body>
+        <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+        <style>
+         #main {
+             width: 100%;
+             display: flex;
+             flex-direction: row;
+         }
+         #rules {
+             flex: 1;
+         }
+         #results {
+             flex: 1;
+         }
+         #main textarea {
+             width: 90%;
+             height: 40em;
+         }
+        </style>
+        <div id="container">
+            <div id="header"></div>
+            <div id="toolbar">
+            </div>
+            <div id="main">
+                <div id="rules" onchange="conv()" onkeyup="conv()">
+                    <textarea>
++0.0.0.0/0
+-192.168.0.0/16
+                    </textarea>
+                </div>
+                <div id="results">
+                    <textarea></textarea>
+                </div>
+            </div>
+        </div>
+        <script src="./bootstrap.js"></script>
+    </body>
+</html>
