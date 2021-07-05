@@ -54,11 +54,7 @@
 /******/ 	var wasmImportObjects = {
 /******/ 		"../pkg/netcalc_bg.wasm": function() {
 /******/ 			return {
-/******/ 				"./netcalc_bg.js": {
-/******/ 					"__wbg_log_e9d09c813ace85f1": function(p0i32,p1i32) {
-/******/ 						return installedModules["../pkg/netcalc_bg.js"].exports["__wbg_log_e9d09c813ace85f1"](p0i32,p1i32);
-/******/ 					}
-/******/ 				}
+/******/
 /******/ 			};
 /******/ 		},
 /******/ 	};
@@ -159,7 +155,7 @@
 /******/ 				promises.push(installedWasmModuleData);
 /******/ 			else {
 /******/ 				var importObject = wasmImportObjects[wasmModuleId]();
-/******/ 				var req = fetch(__webpack_require__.p + "" + {"../pkg/netcalc_bg.wasm":"139dcc1fa3e4c408b0ee"}[wasmModuleId] + ".module.wasm");
+/******/ 				var req = fetch(__webpack_require__.p + "" + {"../pkg/netcalc_bg.wasm":"be0ddfefaa3511a70c01"}[wasmModuleId] + ".module.wasm");
 /******/ 				var promise;
 /******/ 				if(importObject instanceof Promise && typeof WebAssembly.compileStreaming === 'function') {
 /******/ 					promise = Promise.all([WebAssembly.compileStreaming(req), importObject]).then(function(items) {
