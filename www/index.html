@@ -25,24 +25,51 @@
          #header {
              font-size: 2em;
          }
+         div {
+             margin-bottom: 10pt;
+         }
+         #main {
+             margin-bottom: 0;
+         }
+         code {
+             border: 0.5px solid;
+         }
         </style>
         <div id="container">
             <div id="header">Netcalc</div>
             <div id="usage">
-                Prefix IP or CDIR with <code>+</code> or <code>-</code> symbols to add or delete them to/from the set. Enter one IP/CIDR per line. The result will be shown on the right.
+                Usage: Prefix IP or CDIR with <code>+</code> or <code>-</code> symbols to add or delete them to/from the set. Enter one IP/CIDR per line. The result will be shown on the right.
             </div>
             <div id="toolbar">
+                <label for="separator">Separator:</label>
+                <select id="separator" onchange="conv()">
+                    <option value="\n" selected>newline</option>
+                    <option value=",">,</option>
+                    <option value=";">;</option>
+                    <option value=":">:</option>
+                </select>
             </div>
             <div id="main">
                 <div id="rules" onchange="conv()" onkeyup="conv()">
+                    Input: <br/>
                     <textarea>
+# include the full IP range
 +0.0.0.0/0
+# exclude private IP ranges
+-127.0.0.0/8
 -192.168.0.0/16
-                    </textarea>
+-10.0.0.0/16
+-172.16.0.0/12
+# add back a specific IP
++1.1.1.1</textarea>
                 </div>
                 <div id="results">
+                    Output: <br/>
                     <textarea></textarea>
                 </div>
+            </div>
+            <div id="footer">
+                <em>Check out the source code on <a href="https://gist.github.com/shouya/cabbcb27499956dc5e11bb30c074ebae">gist</a> and <a href="https://github.com/shouya/netcalc">github</a>.</em>
             </div>
         </div>
         <script src="./bootstrap.js"></script>
