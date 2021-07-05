@@ -3,12 +3,6 @@ use std::str::FromStr;
 
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-extern "C" {
-  #[wasm_bindgen(js_namespace = console)]
-  fn log(s: &str);
-}
-
 #[derive(Clone, Debug)]
 pub enum Tree {
   Sat,
@@ -85,7 +79,6 @@ impl Bits {
   pub fn parse_v4_addr(s: &str) -> Result<Self> {
     let mut bits = Self::empty();
     for segment in s.split(".") {
-      log(segment);
       let byte = u8::from_str(dbg!(&segment))?;
       bits.extend(Self::from_u8(byte));
     }
@@ -99,7 +92,6 @@ impl Bits {
       [left, right] => {
         let mut addr = Self::parse_v4_addr(left)?;
         let len = u8::from_str(right)?;
-        log(&format!("{:?}", addr));
         ensure!(len <= 32, "Invalid IPv4 CIDR prefix length");
         addr.truncate(len as usize);
         Ok(addr)
