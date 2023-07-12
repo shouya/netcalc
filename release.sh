@@ -11,9 +11,18 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 )
 
 # build html and js
-mkdir -p dist
+git subtree add --prefix=dist origin gh-pages || true
+rm -rf dist/*
 cp pkg/* dist/
 cp www/* dist/
 
+# print the content of the dist folder
+ls dist
+
 # release to github pages
-git subtree push --prefix dist origin gh-pages
+(
+  cd dist;
+  git add -A;
+  git commit -m "release";
+  git push
+)
