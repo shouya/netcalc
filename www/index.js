@@ -1,14 +1,14 @@
-import * as wasm_bindgen from "/netcalc.js";
+const { convert } = wasm_bindgen;
 
 async function conv() {
-  await wasm_bindgen();
+  await wasm_bindgen("./netcalc_bg.wasm");
 
   const input = document.querySelector("#rules textarea").value;
   let sep = document.querySelector("#separator").value;
   if (sep == "\\n") {
     sep = "\n";
   }
-  const output = wasm_bindgen.convert(sep, input);
+  const output = convert(sep, input);
   document.querySelector("#results textarea").value = output;
 }
 

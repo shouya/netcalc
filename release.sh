@@ -3,13 +3,13 @@
 set -xe
 
 # build wasm and helper js
+rm -rf pkg
 wasm-pack build --target no-modules
 
 # prepare for release
-mkdir -p gh-pages
-rm -rf gh-pages/*
-
+rm -rf gh-pages
 mkdir -p gh-pages/.github/workflows gh-pages/dist
+
 # or the github action won't run
 cp .github/workflows/gh-pages.yml gh-pages/.github/workflows/
 cp pkg/* gh-pages/dist/
@@ -19,4 +19,4 @@ cp www/* gh-pages/dist/
 tree -ah gh-pages/
 
 # release to github pages
-npx gh-pages -d gh-pages
+# npx gh-pages --dotfiles --dist gh-pages
