@@ -32,15 +32,15 @@ impl From<u8> for Bit {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Bits(Vec<Bit>);
+pub struct Prefix(Vec<Bit>);
 
-impl From<&[u8]> for Bits {
+impl From<&[u8]> for Prefix {
   fn from(bits: &[u8]) -> Self {
     Self(bits.iter().map(|b| Bit::from(*b)).collect())
   }
 }
 
-impl Bits {
+impl Prefix {
   pub fn empty() -> Self {
     Self(vec![])
   }
@@ -67,7 +67,7 @@ impl Bits {
 
     for chunk in self.0.chunks(n) {
       ensure!(chunk.len() == n, "cannot chunk by non-uniform size");
-      out.push(Bits(chunk.to_vec()).to_u64()?)
+      out.push(Prefix(chunk.to_vec()).to_u64()?)
     }
 
     Ok(out)
@@ -87,13 +87,14 @@ impl Bits {
     Ok(out)
   }
 
-  pub fn extend(&mut self, other: Bits) {
+  pub fn extend(&mut self, other: Prefix) {
     self.0.extend(other.0)
   }
   pub fn push(&mut self, bit: Bit) {
     self.0.push(bit)
   }
 
+  // a non-mutating version of push
   pub fn append(&self, bit: Bit) -> Self {
     let mut out = self.clone();
     out.push(bit);
@@ -108,7 +109,7 @@ impl Bits {
   }
 
   pub fn split(mut self) -> Result<(Bit, Self)> {
-    ensure!(self.len() > 0, "Cannot split on empty bits");
+    ensure!(self.len() > 0, "Cannot split on empty prefix");
     let tail = self.0.split_off(1);
     let head = self.0[0];
     Ok((head, Self(tail)))
@@ -119,7 +120,7 @@ impl Bits {
   }
 }
 
-impl PartialOrd for Bits {
+impl PartialOrd for Prefix {
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
     use EitherOrBoth::{Both, Left, Right};
     use Ordering::{Equal, Greater, Less};
@@ -156,12 +157,12 @@ impl Tree {
     Mixed(Box::new(l), Box::new(r))
   }
 
-  pub fn from_range(start: &Bits, end: &Bits) -> Result<Self> {
+  pub fn from_range(start: &Prefix, end: &Prefix) -> Result<Self> {
     ensure!(start <= end, "In a range, start must be <= end");
-    Ok(Self::from_range_at(Bits::empty(), start, end))
+    Ok(Self::from_range_at(Prefix::empty(), start, end))
   }
 
-  fn from_range_at(curr: Bits, start: &Bits, end: &Bits) -> Self {
+  fn from_range_at(curr: Prefix, start: &Prefix, end: &Prefix) -> Self {
     if &curr < start || &curr > end {
       return Unsat;
     }
@@ -173,14 +174,14 @@ impl Tree {
     let left = Self::from_range_at(curr.append(B0), start, end);
     let right = Self::from_range_at(curr.append(B1), start, end);
 
-    Mixed(Box::new(left.optimize()), Box::new(right.optimize()))
+    Self::mixed(left.optimize(), right.optimize())
   }
 
   pub fn flip(self) -> Self {
     match self {
       Sat => Unsat,
       Unsat => Sat,
-      Mixed(l, r) => Mixed(Box::new(l.flip()), Box::new(r.flip())),
+      Mixed(l, r) => Self::mixed(l.flip(), r.flip()),
     }
   }
 
@@ -218,22 +219,22 @@ impl Tree {
     }
   }
 
-  pub fn add(self, bits: Bits) -> Self {
-    if bits.len() == 0 {
+  pub fn add(self, prefix: Prefix) -> Self {
+    if prefix.len() == 0 {
       return Sat;
     }
-    let (h, t) = bits.split().unwrap();
+    let (h, t) = prefix.split().unwrap();
     match (self, h) {
       (Sat, _) => Sat,
-      (Unsat, B0) => Mixed(Box::new(Unsat.add(t)), Box::new(Unsat)),
-      (Unsat, B1) => Mixed(Box::new(Unsat), Box::new(Unsat.add(t))),
+      (Unsat, B0) => Self::mixed(Unsat.add(t), Unsat),
+      (Unsat, B1) => Self::mixed(Unsat, Unsat.add(t)),
       (Mixed(l, r), B0) => Mixed(Box::new(l.add(t)), r),
       (Mixed(l, r), B1) => Mixed(l, Box::new(r.add(t))),
     }
   }
 
-  pub fn del(self, bits: Bits) -> Self {
-    self.flip().add(bits).flip()
+  pub fn del(self, prefix: Prefix) -> Self {
+    self.flip().add(prefix).flip()
   }
 
   pub fn add_tree(self, tree: Tree) -> Self {
@@ -251,28 +252,23 @@ impl Tree {
       Mixed(l, r) => match (l.optimize(), r.optimize()) {
         (Sat, Sat) => Sat,
         (Unsat, Unsat) => Unsat,
-        (ol, or) => Mixed(Box::new(ol), Box::new(or)),
+        (ol, or) => Self::mixed(ol, or),
       },
     }
   }
 
-  pub fn prefixes(&self) -> Vec<Bits> {
-    self.clone().optimize().prefixes_priv(Bits::empty())
+  pub fn prefixes(&self) -> Vec<Prefix> {
+    self.clone().optimize().prefixes_from(Prefix::empty())
   }
 
-  fn prefixes_priv(self, prefix: Bits) -> Vec<Bits> {
+  fn prefixes_from(self, prefix: Prefix) -> Vec<Prefix> {
     match self {
       Sat => vec![prefix],
       Unsat => vec![],
       Mixed(l, r) => {
-        let mut l_prefix = prefix.clone();
-        let mut r_prefix = prefix;
-        l_prefix.push(B0);
-        r_prefix.push(B1);
-
-        let l_iter = l.prefixes_priv(l_prefix);
-        let r_iter = r.prefixes_priv(r_prefix);
-        l_iter.into_iter().chain(r_iter).collect()
+        let mut out = l.prefixes_from(prefix.append(B0));
+        out.extend(r.prefixes_from(prefix.append(B1)));
+        out
       }
     }
   }
@@ -284,8 +280,8 @@ mod test {
 
   #[test]
   fn test_from_range() {
-    let start = Bits::from(&[0, 0, 0, 1u8][..]);
-    let end = Bits::from(&[0, 1, 1, 0u8][..]);
+    let start = Prefix::from(&[0, 0, 0, 1u8][..]);
+    let end = Prefix::from(&[0, 1, 1, 0u8][..]);
 
     let expected = Tree::new()
       .add([0, 0, 0, 1u8][..].into())
@@ -303,11 +299,11 @@ mod test {
 
   #[test]
   fn test_chunk() {
-    let mut bits = Bits::from_u8(1);
-    bits.extend(Bits::from_u8(2));
-    bits.extend(Bits::from_u8(3));
-    bits.extend(Bits::from_u8(4));
+    let mut prefix = Prefix::from_u8(1);
+    prefix.extend(Prefix::from_u8(2));
+    prefix.extend(Prefix::from_u8(3));
+    prefix.extend(Prefix::from_u8(4));
 
-    assert_eq!(bits.chunks(8).unwrap(), vec![1, 2, 3, 4]);
+    assert_eq!(prefix.chunks(8).unwrap(), vec![1, 2, 3, 4]);
   }
 }

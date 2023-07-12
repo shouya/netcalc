@@ -5,32 +5,32 @@ use failure::{bail, ensure};
 
 mod alg;
 
-pub use alg::{Bit, Bits, Tree};
+pub use alg::{Bit, Prefix, Tree};
 
 type Result<T> = std::result::Result<T, failure::Error>;
 
 trait AddrType {
-  fn parse_addr(s: &str) -> Result<Bits>;
-  fn parse_cidr(s: &str) -> Result<Bits>;
+  fn parse_addr(s: &str) -> Result<Prefix>;
+  fn parse_cidr(s: &str) -> Result<Prefix>;
   fn parse_range(s: &str) -> Result<Tree>;
-  fn cidr_from_bits(bits: Bits) -> Result<String>;
+  fn cidr_from_prefix(p: Prefix) -> Result<String>;
 }
 
 struct V4;
 
 impl AddrType for V4 {
-  fn parse_addr(s: &str) -> Result<Bits> {
-    let mut bits = Bits::empty();
+  fn parse_addr(s: &str) -> Result<Prefix> {
+    let mut prefix = Prefix::empty();
     for segment in s.split('.') {
       let byte = u8::from_str(segment)?;
-      bits.extend(Bits::from_u8(byte));
+      prefix.extend(Prefix::from_u8(byte));
     }
-    ensure!(bits.len() == 32, "Invalid IPv4 Address");
+    ensure!(prefix.len() == 32, "Invalid IPv4 Address");
 
-    Ok(bits)
+    Ok(prefix)
   }
 
-  fn parse_cidr(s: &str) -> Result<Bits> {
+  fn parse_cidr(s: &str) -> Result<Prefix> {
     match s.split('/').collect::<Vec<_>>().as_slice() {
       [left, right] => {
         let mut addr = Self::parse_addr(left)?;
@@ -54,12 +54,12 @@ impl AddrType for V4 {
     }
   }
 
-  fn cidr_from_bits(mut bits: Bits) -> Result<String> {
-    let len = bits.len();
+  fn cidr_from_prefix(mut prefix: Prefix) -> Result<String> {
+    let len = prefix.len();
     ensure!(len <= 32, "Invalid prefix length");
 
-    bits.right_pad(32, Bit::B0);
-    let chunks = bits.chunks(8)?;
+    prefix.right_pad(32, Bit::B0);
+    let chunks = prefix.chunks(8)?;
     let [a, b, c, d]: [_; 4] = chunks.as_slice().try_into()?;
     Ok(format!("{}.{}.{}.{}/{}", a, b, c, d, len))
   }
@@ -73,7 +73,7 @@ struct App<T>(PhantomData<T>);
 enum Operand<T> {
   #[allow(unused)]
   Unused(T),
-  Bits(Bits),
+  Prefix(Prefix),
   Tree(Tree),
 }
 
@@ -83,8 +83,8 @@ impl<T> Operand<T> {
     T: AddrType,
   {
     T::parse_addr(s)
-      .map(Operand::Bits)
-      .or_else(|_| T::parse_cidr(s).map(Operand::Bits))
+      .map(Operand::Prefix)
+      .or_else(|_| T::parse_cidr(s).map(Operand::Prefix))
       .or_else(|_| T::parse_range(s).map(Operand::Tree))
   }
 }
@@ -117,8 +117,8 @@ impl<T> TreeOp<T> {
 
   fn apply(self, tree: Tree) -> Tree {
     match self {
-      TreeOp::Add(Operand::Bits(bits)) => tree.add(bits),
-      TreeOp::Del(Operand::Bits(bits)) => tree.del(bits),
+      TreeOp::Add(Operand::Prefix(p)) => tree.add(p),
+      TreeOp::Del(Operand::Prefix(p)) => tree.del(p),
       TreeOp::Add(Operand::Tree(o)) => tree.add_tree(o),
       TreeOp::Del(Operand::Tree(o)) => tree.del_tree(o),
       TreeOp::Noop => tree,
@@ -140,7 +140,7 @@ impl<T: AddrType> App<T> {
     let cidrs = tree
       .prefixes()
       .into_iter()
-      .map(T::cidr_from_bits)
+      .map(T::cidr_from_prefix)
       .collect::<Result<Vec<_>>>()?
       .join(sep);
 
