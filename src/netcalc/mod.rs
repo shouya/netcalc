@@ -70,11 +70,15 @@ struct V6;
 
 struct App<T>(PhantomData<T>);
 
+enum Never {}
+
 enum Operand<T> {
-  #[allow(unused)]
-  Unused(T),
   Prefix(Prefix),
   Tree(Tree),
+  // This variant is only here to stop type-checker from complaining
+  // about unused type parameter. The "Never" field ensures it's never
+  // constructed.
+  _Unreachable(Never, PhantomData<T>),
 }
 
 impl<T> Operand<T> {
