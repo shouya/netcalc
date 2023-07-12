@@ -9,6 +9,9 @@
     "netcalc.js",
     "netcalc.d.ts"
   ],
-  "browser": "netcalc.js",
-  "types": "netcalc.d.ts"
+  "module": "netcalc.js",
+  "types": "netcalc.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
 }

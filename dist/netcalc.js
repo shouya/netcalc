@@ -1,15 +1,8 @@
-let wasm_bindgen;
-(function() {
-    const __exports = {};
-    let script_src;
-    if (typeof document !== 'undefined' && document.currentScript !== null) {
-        script_src = new URL(document.currentScript.src, location.href).toString();
-    }
-    let wasm = undefined;
+let wasm;
 
-    const heap = new Array(128).fill(undefined);
+const heap = new Array(128).fill(undefined);
 
-    heap.push(undefined, null, true, false);
+heap.push(undefined, null, true, false);
 
 function getObject(idx) { return heap[idx]; }
 
@@ -113,7 +106,7 @@ function getStringFromWasm0(ptr, len) {
 * @param {string} s
 * @returns {string}
 */
-__exports.convert = function(sep, s) {
+export function convert(sep, s) {
     let deferred3_0;
     let deferred3_1;
     try {
@@ -132,7 +125,7 @@ __exports.convert = function(sep, s) {
         wasm.__wbindgen_add_to_stack_pointer(16);
         wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
     }
-};
+}
 
 function addHeapObject(obj) {
     if (heap_next === heap.length) heap.push(heap.length + 1);
@@ -239,8 +232,8 @@ function initSync(module) {
 async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
-    if (typeof input === 'undefined' && script_src !== 'undefined') {
-        input = script_src.replace(/\.js$/, '_bg.wasm');
+    if (typeof input === 'undefined') {
+        input = new URL('netcalc_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 
@@ -255,6 +248,5 @@ async function __wbg_init(input) {
     return __wbg_finalize_init(instance, module);
 }
 
-wasm_bindgen = Object.assign(__wbg_init, { initSync }, __exports);
-
-})();
+export { initSync }
+export default __wbg_init;
