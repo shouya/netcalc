@@ -1,13 +1,13 @@
-import * as wasm from "netcalc";
+async function conv() {
+  await wasm_bindgen();
 
-window.conv = function () {
   const input = document.querySelector("#rules textarea").value;
   let sep = document.querySelector("#separator").value;
   if (sep == "\\n") {
     sep = "\n";
   }
-  const output = wasm.convert(sep, input);
+  const output = wasm_bindgen.convert(sep, input);
   document.querySelector("#results textarea").value = output;
-};
+}
 
-window.conv();
+conv();
