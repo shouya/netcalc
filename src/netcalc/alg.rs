@@ -80,7 +80,7 @@ impl Bits {
     );
 
     let mut out = 0;
-    for bit in self.0.iter().rev() {
+    for bit in self.0.iter() {
       out <<= 1;
       out |= u8::from(*bit) as u64;
     }
@@ -296,8 +296,18 @@ mod test {
       .add([0, 1, 1, 0u8][..].into())
       .optimize();
 
-    let actual = Tree::from_range(&start, &end);
+    let actual = Tree::from_range(&start, &end).unwrap();
 
     assert_eq!(expected, actual);
+  }
+
+  #[test]
+  fn test_chunk() {
+    let mut bits = Bits::from_u8(1);
+    bits.extend(Bits::from_u8(2));
+    bits.extend(Bits::from_u8(3));
+    bits.extend(Bits::from_u8(4));
+
+    assert_eq!(bits.chunks(8).unwrap(), vec![1, 2, 3, 4]);
   }
 }
