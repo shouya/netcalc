@@ -1,3 +1,5 @@
+import * as wasm_bindgen from "/netcalc.js";
+
 async function conv() {
   await wasm_bindgen();
 

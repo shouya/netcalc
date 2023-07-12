@@ -1,28 +1,22 @@
 #!/bin/bash
 
-set -e
+set -xe
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# build wasm and helper js
+wasm-pack build --target no-modules
 
-# build wasm
-(
-  cd "$SCRIPT_DIR";
-  wasm-pack build
-)
+# prepare for release
+mkdir -p gh-pages
+rm -rf gh-pages/*
 
-# build html and js
-git subtree add --prefix=dist origin gh-pages || true
-rm -rf dist/*
-cp pkg/* dist/
-cp www/* dist/
+mkdir -p gh-pages/.github/workflows gh-pages/dist
+# or the github action won't run
+cp .github/workflows/gh-pages.yml gh-pages/.github/workflows/
+cp pkg/* gh-pages/dist/
+cp www/* gh-pages/dist/
 
 # print the content of the dist folder
-ls dist
+tree -ah gh-pages/
 
 # release to github pages
-(
-  cd dist;
-  git add -A;
-  git commit -m "release";
-  git push
-)
+npx gh-pages -d gh-pages
