@@ -100,6 +100,11 @@ impl<T> TreeOp<T> {
   where
     T: AddrType,
   {
+    // otherwise the [..1] will panic
+    if s.is_empty() {
+      return Ok(TreeOp::Noop);
+    }
+
     match &s[..1] {
       "+" => Ok(TreeOp::Add(Operand::parse(&s[1..])?)),
       "-" => Ok(TreeOp::Del(Operand::parse(&s[1..])?)),
