@@ -1,26 +1,14 @@
 use failure::{bail, ensure};
-use std::str::FromStr;
+use itertools::{EitherOrBoth, Itertools};
+use std::{cmp::Ordering, str::FromStr};
 
-use wasm_bindgen::prelude::*;
-
-#[derive(Clone, Debug)]
-pub enum Tree {
-  Sat,
-  Unsat,
-  Mixed(Box<Tree>, Box<Tree>),
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Bit {
   B0,
   B1,
 }
 
 use Bit::*;
-use Tree::*;
-
-#[derive(Clone, Debug)]
-pub struct Bits(Vec<Bit>);
 
 type Result<T> = std::result::Result<T, failure::Error>;
 
@@ -40,6 +28,15 @@ impl From<u8> for Bit {
       1 => B1,
       _ => panic!("Cannot convert from any non-binary u8"),
     }
+  }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Bits(Vec<Bit>);
+
+impl From<&[u8]> for Bits {
+  fn from(bits: &[u8]) -> Self {
+    Self(bits.iter().map(|b| Bit::from(*b)).collect())
   }
 }
 
@@ -67,6 +64,12 @@ impl Bits {
   }
   pub fn push(&mut self, bit: Bit) {
     self.0.push(bit)
+  }
+
+  pub fn append(&self, bit: Bit) -> Self {
+    let mut out = self.clone();
+    out.push(bit);
+    out
   }
 
   pub fn len(&self) -> usize {
@@ -130,7 +133,8 @@ impl Bits {
   pub fn to_v4_addr(&self) -> Result<String> {
     ensure!(self.len() == 32, "Invalid prefix length");
     let i = self.to_u32()?;
-    let (a, b, c, d) = (i >> 24 & 0xFF, i >> 16 & 0xFF, i >> 8 & 0xFF, i & 0xFF);
+    let (a, b, c, d) =
+      (i >> 24 & 0xFF, i >> 16 & 0xFF, i >> 8 & 0xFF, i & 0xFF);
     Ok(format!("{}.{}.{}.{}", a, b, c, d))
   }
 
@@ -148,9 +152,56 @@ impl Bits {
   }
 }
 
+impl PartialOrd for Bits {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    use EitherOrBoth::{Both, Left, Right};
+    use Ordering::{Equal, Greater, Less};
+
+    for x in self.0.iter().zip_longest(other.0.iter()) {
+      match x {
+        Both(B0, B0) => continue,
+        Both(B1, B1) => continue,
+        Both(B0, B1) => return Some(Less),
+        Both(B1, B0) => return Some(Greater),
+        Right(_) => return None,
+        Left(_) => return None,
+      }
+    }
+
+    Some(Equal)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Tree {
+  Sat,
+  Unsat,
+  Mixed(Box<Tree>, Box<Tree>),
+}
+use Tree::*;
+
 impl Tree {
   pub fn new() -> Self {
     Unsat
+  }
+
+  pub fn from_range(start: &Bits, end: &Bits) -> Self {
+    Self::from_range_at(Bits::empty(), &start, &end)
+  }
+
+  fn from_range_at(curr: Bits, start: &Bits, end: &Bits) -> Self {
+    if &curr < start || &curr > end {
+      return Unsat;
+    }
+
+    if start <= &curr && &curr <= end {
+      return Sat;
+    }
+
+    let left = Self::from_range_at(curr.append(B0), start, end);
+    let right = Self::from_range_at(curr.append(B1), start, end);
+
+    Mixed(Box::new(left.optimize()), Box::new(right.optimize()))
   }
 
   pub fn flip(self) -> Self {
@@ -161,22 +212,56 @@ impl Tree {
     }
   }
 
-  pub fn add_cidr(self, cidr: Bits) -> Self {
+  pub fn union(self, other: Self) -> Self {
+    match (self, other) {
+      (Sat, _) => Sat,
+      (_, Sat) => Sat,
+      (Unsat, Unsat) => Unsat,
+      (Unsat, Mixed(l, r)) => {
+        Mixed(Box::new(Unsat.union(*l)), Box::new(Unsat.union(*r)))
+      }
+      (Mixed(l, r), Unsat) => {
+        Mixed(Box::new(l.union(Unsat)), Box::new(r.union(Unsat)))
+      }
+      (Mixed(l1, r1), Mixed(l2, r2)) => {
+        Mixed(Box::new(l1.union(*l2)), Box::new(r1.union(*r2)))
+      }
+    }
+  }
+
+  pub fn intersect(self, other: Self) -> Self {
+    match (self, other) {
+      (Sat, Sat) => Sat,
+      (_, Unsat) => Unsat,
+      (Unsat, _) => Unsat,
+      (Mixed(l, r), Sat) => {
+        Mixed(Box::new(l.intersect(Sat)), Box::new(r.intersect(Sat)))
+      }
+      (Sat, Mixed(l, r)) => {
+        Mixed(Box::new(Sat.intersect(*l)), Box::new(Sat.intersect(*r)))
+      }
+      (Mixed(l1, r1), Mixed(l2, r2)) => {
+        Mixed(Box::new(l1.intersect(*l2)), Box::new(r1.intersect(*r2)))
+      }
+    }
+  }
+
+  pub fn add(self, cidr: Bits) -> Self {
     if cidr.len() == 0 {
       return Sat;
     }
     let (h, t) = cidr.split().unwrap();
     match (self, h) {
       (Sat, _) => Sat,
-      (Unsat, B0) => Mixed(Box::new(Unsat.add_cidr(t)), Box::new(Unsat)),
-      (Unsat, B1) => Mixed(Box::new(Unsat), Box::new(Unsat.add_cidr(t))),
-      (Mixed(l, r), B0) => Mixed(Box::new(l.add_cidr(t)), r),
-      (Mixed(l, r), B1) => Mixed(l, Box::new(r.add_cidr(t))),
+      (Unsat, B0) => Mixed(Box::new(Unsat.add(t)), Box::new(Unsat)),
+      (Unsat, B1) => Mixed(Box::new(Unsat), Box::new(Unsat.add(t))),
+      (Mixed(l, r), B0) => Mixed(Box::new(l.add(t)), r),
+      (Mixed(l, r), B1) => Mixed(l, Box::new(r.add(t))),
     }
   }
 
   pub fn del_cidr(self, cidr: Bits) -> Self {
-    self.flip().add_cidr(cidr).flip()
+    self.flip().add(cidr).flip()
   }
 
   pub fn optimize(self) -> Self {
@@ -201,7 +286,7 @@ impl Tree {
       Unsat => vec![],
       Mixed(l, r) => {
         let mut l_prefix = prefix.clone();
-        let mut r_prefix = prefix.clone();
+        let mut r_prefix = prefix;
         l_prefix.push(B0);
         r_prefix.push(B1);
 
@@ -227,6 +312,17 @@ pub fn convert(sep: &str, s: &str) -> Result<String> {
   Ok(cidrs)
 }
 
+enum BitsOrTree {
+  Bits(Bits),
+  Tree(Tree),
+}
+
+impl BitsOrTree {
+  fn parse(_s: &str) -> Result<Self> {
+    todo!()
+  }
+}
+
 enum Instruction {
   Add(Bits),
   Del(Bits),
@@ -238,7 +334,7 @@ fn exec_instructions(instructions: &[Instruction]) -> Tree {
   let mut t = Tree::new();
   for inst in instructions {
     match inst {
-      Add(p) => t = t.add_cidr(p.clone()),
+      Add(p) => t = t.add(p.clone()),
       Del(p) => t = t.del_cidr(p.clone()),
     }
   }
@@ -262,5 +358,29 @@ impl Instruction {
     }
 
     Ok(out)
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn test_from_range() {
+    let start = Bits::from(&[0, 0, 0, 1u8][..]);
+    let end = Bits::from(&[0, 1, 1, 0u8][..]);
+
+    let expected = Tree::new()
+      .add([0, 0, 0, 1u8][..].into())
+      .add([0, 0, 1, 0u8][..].into())
+      .add([0, 0, 1, 1u8][..].into())
+      .add([0, 1, 0, 0u8][..].into())
+      .add([0, 1, 0, 1u8][..].into())
+      .add([0, 1, 1, 0u8][..].into())
+      .optimize();
+
+    let actual = Tree::from_range(&start, &end);
+
+    assert_eq!(expected, actual);
   }
 }
