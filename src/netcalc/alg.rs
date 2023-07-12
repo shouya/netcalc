@@ -127,10 +127,14 @@ impl PartialOrd for Prefix {
 
     for x in self.0.iter().zip_longest(other.0.iter()) {
       match x {
+        // skip equal bits
         Both(B0, B0) => continue,
         Both(B1, B1) => continue,
+        // we know one is larger when bits start to differ
         Both(B0, B1) => return Some(Less),
         Both(B1, B0) => return Some(Greater),
+        // one is a shorter prefix representing a set of values, so
+        // we cannot conclusively say that one is larger.
         Right(_) => return None,
         Left(_) => return None,
       }
@@ -174,7 +178,12 @@ impl Tree {
     let left = Self::from_range_at(curr.append(B0), start, end);
     let right = Self::from_range_at(curr.append(B1), start, end);
 
-    Self::mixed(left.optimize(), right.optimize())
+    // Why is "optimize" needed here? Because of the PartialOrd
+    // definition, we cannot conclusively say, e.g. 255.255.255.255/32
+    // is larger than or equal to 0.0.0.0/0 even though it is true.
+    // so the range comparison (start <= &curr && &curr <= end)
+    // doesn't always give the complete picture.
+    Self::mixed(left, right).optimize()
   }
 
   pub fn flip(self) -> Self {
