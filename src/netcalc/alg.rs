@@ -152,6 +152,10 @@ impl Tree {
     Unsat
   }
 
+  pub fn mixed(l: Self, r: Self) -> Self {
+    Mixed(Box::new(l), Box::new(r))
+  }
+
   pub fn from_range(start: &Bits, end: &Bits) -> Self {
     Self::from_range_at(Bits::empty(), start, end)
   }
@@ -181,26 +185,43 @@ impl Tree {
 
   pub fn union(self, other: Self) -> Self {
     match (self, other) {
-      (Sat, _) => Sat,
+      // sat or unsat on the right
       (_, Sat) => Sat,
-      (Unsat, Unsat) => Unsat,
-      (Unsat, Mixed(l, r)) => {
-        Mixed(Box::new(Unsat.union(*l)), Box::new(Unsat.union(*r)))
-      }
-      (Mixed(l, r), Unsat) => {
-        Mixed(Box::new(l.union(Unsat)), Box::new(r.union(Unsat)))
-      }
+      (a, Unsat) => a,
+      // sat or unsat on the left
+      (Sat, _) => Sat,
+      (Unsat, b) => b,
+      // both mixed
       (Mixed(l1, r1), Mixed(l2, r2)) => {
-        Mixed(Box::new(l1.union(*l2)), Box::new(r1.union(*r2)))
+        let l = l1.union(*l2);
+        let r = r1.union(*r2);
+        Self::mixed(l, r).optimize()
       }
     }
   }
 
-  pub fn add(self, cidr: Bits) -> Self {
-    if cidr.len() == 0 {
+  pub fn difference(self, other: Self) -> Self {
+    match (self, other) {
+      // sat or unsat on the right
+      (_, Sat) => Unsat,
+      (a, Unsat) => a,
+      // sat or unsat on the left
+      (Sat, b) => b.flip(),
+      (Unsat, _) => Unsat,
+      // both mixed
+      (Mixed(a0, a1), Mixed(b0, b1)) => {
+        let l = a0.difference(*b0);
+        let r = a1.difference(*b1);
+        Self::mixed(l, r).optimize()
+      }
+    }
+  }
+
+  pub fn add(self, bits: Bits) -> Self {
+    if bits.len() == 0 {
       return Sat;
     }
-    let (h, t) = cidr.split().unwrap();
+    let (h, t) = bits.split().unwrap();
     match (self, h) {
       (Sat, _) => Sat,
       (Unsat, B0) => Mixed(Box::new(Unsat.add(t)), Box::new(Unsat)),
@@ -210,16 +231,16 @@ impl Tree {
     }
   }
 
-  pub fn del(self, cidr: Bits) -> Self {
-    self.flip().add(cidr).flip()
+  pub fn del(self, bits: Bits) -> Self {
+    self.flip().add(bits).flip()
   }
 
   pub fn add_tree(self, tree: Tree) -> Self {
     self.union(tree)
   }
 
-  pub fn del_tree(self, _tree: Tree) -> Self {
-    todo!()
+  pub fn del_tree(self, tree: Tree) -> Self {
+    self.difference(tree)
   }
 
   pub fn optimize(self) -> Self {
