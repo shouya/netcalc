@@ -9,7 +9,7 @@ pub use alg::{Bit, Bits, Tree};
 
 type Result<T> = std::result::Result<T, failure::Error>;
 
-trait Foo {
+trait AddrType {
   fn parse_addr(s: &str) -> Result<Bits>;
   fn parse_cidr(s: &str) -> Result<Bits>;
   fn parse_range(s: &str) -> Result<Tree>;
@@ -18,11 +18,11 @@ trait Foo {
 
 struct V4;
 
-impl Foo for V4 {
+impl AddrType for V4 {
   fn parse_addr(s: &str) -> Result<Bits> {
     let mut bits = Bits::empty();
-    for segment in s.split(".") {
-      let byte = u8::from_str(&segment)?;
+    for segment in s.split('.') {
+      let byte = u8::from_str(segment)?;
       bits.extend(Bits::from_u8(byte));
     }
     ensure!(bits.len() == 32, "Invalid IPv4 Address");
@@ -31,7 +31,7 @@ impl Foo for V4 {
   }
 
   fn parse_cidr(s: &str) -> Result<Bits> {
-    match s.split("/").collect::<Vec<_>>().as_slice() {
+    match s.split('/').collect::<Vec<_>>().as_slice() {
       [left, right] => {
         let mut addr = Self::parse_addr(left)?;
         let len = u8::from_str(right)?;
@@ -44,7 +44,7 @@ impl Foo for V4 {
   }
 
   fn parse_range(s: &str) -> Result<Tree> {
-    match s.split("-").collect::<Vec<_>>().as_slice() {
+    match s.split('-').collect::<Vec<_>>().as_slice() {
       [left, right] => {
         let left = Self::parse_addr(left)?;
         let right = Self::parse_addr(right)?;
@@ -71,6 +71,7 @@ struct V6;
 struct App<T>(PhantomData<T>);
 
 enum Operand<T> {
+  #[allow(unused)]
   Unused(T),
   Bits(Bits),
   Tree(Tree),
@@ -79,7 +80,7 @@ enum Operand<T> {
 impl<T> Operand<T> {
   fn parse(s: &str) -> Result<Self>
   where
-    T: Foo,
+    T: AddrType,
   {
     T::parse_addr(s)
       .map(Operand::Bits)
@@ -97,7 +98,7 @@ enum TreeOp<T> {
 impl<T> TreeOp<T> {
   fn parse(s: &str) -> Result<Self>
   where
-    T: Foo,
+    T: AddrType,
   {
     match &s[..1] {
       "+" => Ok(TreeOp::Add(Operand::parse(&s[1..])?)),
@@ -121,7 +122,7 @@ impl<T> TreeOp<T> {
   }
 }
 
-impl<T: Foo> App<T> {
+impl<T: AddrType> App<T> {
   fn convert(sep: &str, s: &str) -> Result<String> {
     let mut tree = Tree::new();
 

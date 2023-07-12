@@ -65,7 +65,7 @@ impl Bits {
 
     let mut out = vec![];
 
-    for chunk in self.0.chunks(n).into_iter() {
+    for chunk in self.0.chunks(n) {
       ensure!(chunk.len() == n, "cannot chunk by non-uniform size");
       out.push(Bits(chunk.to_vec()).to_u64()?)
     }
@@ -153,7 +153,7 @@ impl Tree {
   }
 
   pub fn from_range(start: &Bits, end: &Bits) -> Self {
-    Self::from_range_at(Bits::empty(), &start, &end)
+    Self::from_range_at(Bits::empty(), start, end)
   }
 
   fn from_range_at(curr: Bits, start: &Bits, end: &Bits) -> Self {
@@ -196,23 +196,6 @@ impl Tree {
     }
   }
 
-  pub fn intersect(self, other: Self) -> Self {
-    match (self, other) {
-      (Sat, Sat) => Sat,
-      (_, Unsat) => Unsat,
-      (Unsat, _) => Unsat,
-      (Mixed(l, r), Sat) => {
-        Mixed(Box::new(l.intersect(Sat)), Box::new(r.intersect(Sat)))
-      }
-      (Sat, Mixed(l, r)) => {
-        Mixed(Box::new(Sat.intersect(*l)), Box::new(Sat.intersect(*r)))
-      }
-      (Mixed(l1, r1), Mixed(l2, r2)) => {
-        Mixed(Box::new(l1.intersect(*l2)), Box::new(r1.intersect(*r2)))
-      }
-    }
-  }
-
   pub fn add(self, cidr: Bits) -> Self {
     if cidr.len() == 0 {
       return Sat;
@@ -232,10 +215,10 @@ impl Tree {
   }
 
   pub fn add_tree(self, tree: Tree) -> Self {
-    todo!()
+    self.union(tree)
   }
 
-  pub fn del_tree(self, tree: Tree) -> Self {
+  pub fn del_tree(self, _tree: Tree) -> Self {
     todo!()
   }
 
