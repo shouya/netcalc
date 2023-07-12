@@ -156,8 +156,9 @@ impl Tree {
     Mixed(Box::new(l), Box::new(r))
   }
 
-  pub fn from_range(start: &Bits, end: &Bits) -> Self {
-    Self::from_range_at(Bits::empty(), start, end)
+  pub fn from_range(start: &Bits, end: &Bits) -> Result<Self> {
+    ensure!(start <= end, "In a range, start must be <= end");
+    Ok(Self::from_range_at(Bits::empty(), start, end))
   }
 
   fn from_range_at(curr: Bits, start: &Bits, end: &Bits) -> Self {

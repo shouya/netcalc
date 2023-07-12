@@ -48,7 +48,7 @@ impl AddrType for V4 {
       [left, right] => {
         let left = Self::parse_addr(left)?;
         let right = Self::parse_addr(right)?;
-        Ok(Tree::from_range(&left, &right))
+        Ok(Tree::from_range(&left, &right)?)
       }
       _ => bail!("Invalid IPv4 range"),
     }
