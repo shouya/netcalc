@@ -18,6 +18,11 @@ itertools = { version = "0.11.0", default-features = false }
 wasm-bindgen-test = "0.3.13"
 
 [profile.release]
-# Tell `rustc` to optimize for small code size.
+# Optimize for small code size.
 opt-level = "s"
+# LTO is extremely helpful in spotting unused deps and reducing binary
+# size.
 lto = true
+# Generate debug info for twiggy for size profiling. Any debug info is
+# stripped by wasm-pack.
+debug = true
