@@ -46,6 +46,11 @@
         result will be shown on the right.
       </div>
       <div id="toolbar">
+        <label for="version">IP version:</label>
+        <select id="version" onchange="conv()">
+          <option value="v4" selected>IPv4</option>
+          <option value="v6">IPv6</option>
+        </select>
         <label for="separator">Separator:</label>
         <select id="separator" onchange="conv()">
           <option value="\n" selected>newline</option>

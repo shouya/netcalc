@@ -2,11 +2,12 @@ declare namespace wasm_bindgen {
 	/* tslint:disable */
 	/* eslint-disable */
 	/**
+	* @param {string} ver
 	* @param {string} sep
 	* @param {string} s
 	* @returns {string}
 	*/
-	export function convert(sep: string, s: string): string;
+	export function convert(ver: string, sep: string, s: string): string;
 	
 }
 
@@ -14,7 +15,7 @@ declare type InitInput = RequestInfo | URL | Response | BufferSource | WebAssemb
 
 declare interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly convert: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly convert: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
