@@ -8,7 +8,7 @@ async function conv() {
   if (sep == "\\n") {
     sep = "\n";
   }
-  const output = convert(sep, input);
+  const output = convert("v4", sep, input);
   document.querySelector("#results textarea").value = output;
 }
 
