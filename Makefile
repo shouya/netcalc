@@ -6,7 +6,7 @@ WWW_SRC_FILES = $(wildcard www/**/*)
 
 # Serve locally for development
 dev-server: gh-pages
-	npx $</dist http-server -c-1 --cors
+	npx http-server $</dist -c-1 --cors
 
 # Publish to github pages
 publish: gh-pages

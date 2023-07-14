@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 use std::{convert::TryInto, marker::PhantomData};
 
@@ -70,8 +70,65 @@ impl AddrType for V4 {
   }
 }
 
-#[allow(unused)]
 struct V6;
+
+impl AddrType for V6 {
+  fn parse_addr(s: &str) -> Result<Prefix> {
+    let mut prefix = Prefix::empty();
+    let ip_addr = Ipv6Addr::from_str(s)?;
+    for byte in ip_addr.octets() {
+      prefix.extend(Prefix::from_u8(byte));
+    }
+    ensure!(prefix.len() == 128, "Invalid IPv6 Address");
+
+    Ok(prefix)
+  }
+
+  fn parse_cidr(s: &str) -> Result<Prefix> {
+    match s.split('/').collect::<Vec<_>>().as_slice() {
+      [left, right] => {
+        let ip_addr = Ipv6Addr::from_str(left)?;
+        let mut addr = Self::parse_addr(ip_addr.to_string().as_str())?;
+        let len = u8::from_str(right)?;
+        ensure!(len <= 128, "Invalid IPv6 CIDR prefix length");
+        addr.truncate(len as usize);
+        Ok(addr)
+      }
+      _ => bail!("Invalid IPv6 CIDR"),
+    }
+  }
+
+  fn parse_range(s: &str) -> Result<Tree> {
+    match s.split('-').collect::<Vec<_>>().as_slice() {
+      [left, right] => {
+        let left_ip_addr = Ipv6Addr::from_str(left)?;
+        let right_ip_addr = Ipv6Addr::from_str(right)?;
+        let left = Self::parse_addr(left_ip_addr.to_string().as_str())?;
+        let right = Self::parse_addr(right_ip_addr.to_string().as_str())?;
+        Ok(Tree::from_range(&left, &right)?)
+      }
+      _ => bail!("Invalid IPv6 range"),
+    }
+  }
+
+  fn cidr_from_prefix(mut prefix: Prefix) -> Result<String> {
+    let len = prefix.len();
+    ensure!(len <= 128, "Invalid prefix length");
+
+    prefix.right_pad(128, Bit::B0);
+    let chunks = prefix.chunks(16)?;
+
+    let [a, b, c, d, e, f, g, h]: [_; 8] = chunks.as_slice().try_into()?;
+    let [a, b, c, d, e, f, g, h] = [
+      a as u16, b as u16, c as u16, d as u16, e as u16, f as u16, g as u16,
+      h as u16,
+    ];
+
+    let ip_addr = Ipv6Addr::new(a, b, c, d, e, f, g, h);
+
+    Ok(format!("{}/{}", ip_addr, len))
+  }
+}
 
 struct App<T>(PhantomData<T>);
 
@@ -160,8 +217,8 @@ impl<T: AddrType> App<T> {
 #[allow(unused)]
 pub fn convert(version: &str, sep: &str, s: &str) -> Result<String> {
   match version {
-    "4" => App::<V4>::convert(sep, s),
-    // "6" => App::<V6>::convert(sep, s),
+    "v4" => App::<V4>::convert(sep, s),
+    "v6" => App::<V6>::convert(sep, s),
     _ => bail!("Unrecognized version: {}", version),
   }
 }
