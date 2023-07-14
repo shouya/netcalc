@@ -1,3 +1,4 @@
+use std::net::Ipv4Addr;
 use std::str::FromStr;
 use std::{convert::TryInto, marker::PhantomData};
 
@@ -21,8 +22,8 @@ struct V4;
 impl AddrType for V4 {
   fn parse_addr(s: &str) -> Result<Prefix> {
     let mut prefix = Prefix::empty();
-    for segment in s.split('.') {
-      let byte = u8::from_str(segment)?;
+    let ip_addr = Ipv4Addr::from_str(s)?;
+    for byte in ip_addr.octets() {
       prefix.extend(Prefix::from_u8(byte));
     }
     ensure!(prefix.len() == 32, "Invalid IPv4 Address");
@@ -33,7 +34,8 @@ impl AddrType for V4 {
   fn parse_cidr(s: &str) -> Result<Prefix> {
     match s.split('/').collect::<Vec<_>>().as_slice() {
       [left, right] => {
-        let mut addr = Self::parse_addr(left)?;
+        let ip_addr = Ipv4Addr::from_str(left)?;
+        let mut addr = Self::parse_addr(ip_addr.to_string().as_str())?;
         let len = u8::from_str(right)?;
         ensure!(len <= 32, "Invalid IPv4 CIDR prefix length");
         addr.truncate(len as usize);
@@ -46,8 +48,10 @@ impl AddrType for V4 {
   fn parse_range(s: &str) -> Result<Tree> {
     match s.split('-').collect::<Vec<_>>().as_slice() {
       [left, right] => {
-        let left = Self::parse_addr(left)?;
-        let right = Self::parse_addr(right)?;
+        let left_ip_addr = Ipv4Addr::from_str(left)?;
+        let right_ip_addr = Ipv4Addr::from_str(right)?;
+        let left = Self::parse_addr(left_ip_addr.to_string().as_str())?;
+        let right = Self::parse_addr(right_ip_addr.to_string().as_str())?;
         Ok(Tree::from_range(&left, &right)?)
       }
       _ => bail!("Invalid IPv4 range"),
@@ -61,7 +65,8 @@ impl AddrType for V4 {
     prefix.right_pad(32, Bit::B0);
     let chunks = prefix.chunks(8)?;
     let [a, b, c, d]: [_; 4] = chunks.as_slice().try_into()?;
-    Ok(format!("{}.{}.{}.{}/{}", a, b, c, d, len))
+    let ip_addr = Ipv4Addr::new(a as u8, b as u8, c as u8, d as u8);
+    Ok(format!("{}/{}", ip_addr, len))
   }
 }
 
